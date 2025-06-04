@@ -1,4 +1,5 @@
 import { Knex } from 'knex';
+import { createHash } from 'node:crypto';
 
 /**
  * Manages in-memory caching for query results.
@@ -19,16 +20,13 @@ class CacheManager {
    */
   public static generateKey(query: Knex.QueryBuilder): string {
     try {
+      // ...existing code...
       const sql = query.toSQL();
-      // Include both SQL and bindings in the key to ensure uniqueness
-      const keyData = {
-        method: sql.method,
-        sql: sql.sql,
-        bindings: sql.bindings,
-      };
-      return `count_${Buffer.from(JSON.stringify(keyData)).toString('base64').slice(0, 32)}`;
+      const str = [sql.method, sql.sql, JSON.stringify(sql.bindings)].join('|');
+      const hash = createHash('sha256').update(str).digest('hex');
+      return `count_${hash}`;
     } catch {
-      return `count_${Date.now()}`; // Fallback to a timestamp if serialization fails
+      return `count_${Date.now()}`;
     }
   }
 
