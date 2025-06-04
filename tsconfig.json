@@ -1,24 +1,37 @@
 {
   "compilerOptions": {
+    // Module settings
     "module": "commonjs",
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
     "target": "ES2021",
+    "lib": ["ES2021"],
+    "moduleResolution": "node",
+
+    // Emit settings
+    "declaration": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
+    "removeComments": false, // JSDoc kommentlarini saqlab qolish uchun
+
+    // Type checking
+    "strict": true,
+    "strictNullChecks": true, // Type safety uchun yoqish kerak
+    "noImplicitAny": true, // Type safety uchun yoqish kerak
+    "strictBindCallApply": true,
+
+    // Additional settings
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "strictNullChecks": false,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "forceConsistentCasingInFileNames": false,
-    "noFallthroughCasesInSwitch": false
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["lib/*"]
+    },
+
+    // Enhanced features
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "incremental": true
   },
-  "include": [
-    "lib/**/*"
-  ]
+  "include": ["lib/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
