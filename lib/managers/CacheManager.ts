@@ -19,11 +19,14 @@ class CacheManager {
    */
   public static generateKey(query: Knex.QueryBuilder): string {
     try {
-      // Using a basic hash of the SQL query string for a cache key.
-      // For very high-traffic production, consider a more robust hashing algorithm (e.g., SHA256)
-      // or a more predictable key based on query parameters.
       const sql = query.toSQL();
-      return `count_${Buffer.from(JSON.stringify(sql)).toString('base64').slice(0, 32)}`;
+      // Include both SQL and bindings in the key to ensure uniqueness
+      const keyData = {
+        method: sql.method,
+        sql: sql.sql,
+        bindings: sql.bindings,
+      };
+      return `count_${Buffer.from(JSON.stringify(keyData)).toString('base64').slice(0, 32)}`;
     } catch {
       return `count_${Date.now()}`; // Fallback to a timestamp if serialization fails
     }
