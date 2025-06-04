@@ -18,6 +18,9 @@ class CursorManager {
    */
   public static encodeCursor(data: CursorData): string {
     try {
+      if (!data || !data.column || data.value === undefined) {
+        throw new Error('Invalid cursor data structure');
+      }
       const jsonString = JSON.stringify(data);
       return Buffer.from(jsonString).toString('base64');
     } catch (error: any) {
@@ -63,18 +66,19 @@ class CursorManager {
    * // Returns encoded string containing: { column: 'id', value: 123 }
    * ```
    */
-  public static createCursor(record: any, column: string): string {
-    if (!record || record[column] === undefined) {
-      throw new Error(`Cannot create cursor: column '${column}' not found in record`);
+  public static createCursor(record: Record<string, any>, column: string): string {
+    if (!record || record[column] === null) {
+      throw new Error('Invalid cursor value');
     }
 
-    const cursorData: CursorData = {
-      value: record[column],
-      column,
-      timestamp: Date.now(),
-    };
+    if (!(column in record)) {
+      throw new Error(`Cannot create cursor: invalid value for column '${column}'`);
+    }
 
-    return this.encodeCursor(cursorData);
+    return this.encodeCursor({
+      column,
+      value: record[column],
+    });
   }
 }
 export default CursorManager;
