@@ -2,12 +2,11 @@
   "extends": "./tsconfig.json",
   "exclude": [
     "node_modules",
+    "src",
     "test",
     "dist",
     "**/*spec.ts",
-    "**/*.test.ts",
-    "**/__tests__/*",
-    "**/__mocks__/*"
+    "**/*.test.ts"
   ],
   "compilerOptions": {
     "sourceMap": false,

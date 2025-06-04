@@ -32,6 +32,6 @@
     "emitDecoratorMetadata": true,
     "incremental": true
   },
-  "include": ["lib/**/*"],
+  "include": ["lib/**/*", "src/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]
 }
