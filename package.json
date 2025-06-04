@@ -12,8 +12,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "prepare": "npm run build",
-    "lint": "eslint \"lib/**/*.ts\"",
-    "lint:fix": "eslint \"lib/**/*.ts\" --fix",
+    "lint": "eslint \"{lib,src,test}/**/*.ts\"",
+    "lint:fix": "eslint \"{lib,src,test}/**/*.ts\" --fix",
     "prepublishOnly": "npm test && npm run lint",
     "test": "jest",
     "test:watch": "jest --watch",
