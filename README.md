@@ -1,131 +1,211 @@
 # KnexMagic
 
-KnexMagic is a utility library for working with the Knex.js query builder and provides methods for filtering and paginating data using cursor pagination. It is designed to simplify common data filtering and pagination tasks when working with a database using Knex.js.
+![Version](https://img.shields.io/npm/v/knex-magic)
+![License](https://img.shields.io/npm/l/knex-magic)
+![Downloads](https://img.shields.io/npm/dm/knex-magic)
+
+Advanced cursor-based pagination and filtering utility for Knex.js applications with TypeScript support.
+
+## Features
+
+- 🚀 **Cursor-based Pagination**: Efficient pagination for large datasets
+- 🎯 **Smart Filtering**: Complex filtering with support for:
+  - Range filters
+  - Text search
+  - Array filters
+  - Nested object filters
+- ⚡ **Performance Optimizations**:
+  - Query caching
+  - Estimated counts for large datasets
+  - PostgreSQL-specific optimizations
+- 📦 **TypeScript Support**: Full type safety and IntelliSense
+- 🔧 **Customizable**: Flexible configuration options
+- 🧪 **Well Tested**: Comprehensive test coverage
 
 ## Installation
 
-You can install KnexMagic via npm:
-
 ```bash
+# Using npm
 npm install knex-magic
+
+# Using yarn
+yarn add knex-magic
+
+# Using pnpm
+pnpm add knex-magic
 ```
 
-## Usage
+## Quick Start
 
-Here's how you can use KnexMagic in your Node.js application:
+```typescript
+import { KnexMagic } from 'knex-magic';
 
-```ts
-import { KnexMagic } from "knex-magic";
-
-// Initialize a Knex.QueryBuilder instance
-const knex = require("knex")(knexConfig);
-const query = knex("your_table_name");
-
-// Filtering Data
-const filterParams = {
-  // Define your filter parameters
-};
-
-const filteredQuery = KnexMagic.filter(query, filterParams);
-
-// Cursor Pagination
-const cursorParams = {
-  cursor: "some_cursor_value", // Optional
-  take: 10, // Optional, default is 10
-  direction: "next", // Optional, 'next' or 'previous', default is 'next'
-};
-
-const options = {
-  key: "id", // Optional, the cursor column, default is 'id'
-  keyPrefix: "id", // Optional, the prefix for the cursor column, default is 'id'
-};
-
-// Define a callback to count the total number of records (optional)
-const callbackCountQuery = async (query) => {
-  return query.clone().count("id as count");
-};
-
+// Basic pagination
 const result = await KnexMagic.paginate({
-  query: filteredQuery,
-  cursorParams,
-  options,
-  callbackCountQuery,
+  query: knex('users'),
+  cursorParams: { 
+    take: 10,
+    cursor: 'next-page-cursor'
+  }
+});
+
+// With filtering
+const filteredResult = await KnexMagic.paginate({
+  query: knex('users'),
+  cursorParams: { take: 10 },
+  filters: {
+    status: 'active',
+    age: { min: 18, max: 65 },
+    skills: ['javascript', 'typescript'],
+    search: {
+      columns: ['name', 'email'],
+      value: 'john',
+      mode: 'contains'
+    }
+  }
+});
+```
+
+## Detailed Usage
+
+### Cursor-based Pagination
+
+```typescript
+const result = await KnexMagic.paginate({
+  query: knex('users'),
+  cursorParams: {
+    take: 10,
+    cursor: 'encoded-cursor-string',
+    direction: 'next',
+    skipTotalCount: false,
+    estimatedTotal: 1000
+  },
+  options: {
+    cursorColumn: 'id',
+    orderByColumn: 'created_at',
+    orderDirection: 'desc',
+    useEstimatedCount: true,
+    cache: {
+      enabled: true,
+      ttl: 300 // 5 minutes
+    }
+  }
 });
 
 console.log(result);
+// {
+//   data: [...],
+//   pageInfo: {
+//     hasNextPage: true,
+//     hasPreviousPage: false,
+//     startCursor: 'encoded-start',
+//     endCursor: 'encoded-end'
+//   },
+//   totalCount: 1000,
+//   meta: {
+//     executionTime: 45,
+//     isEstimated: true,
+//     cacheHit: false
+//   }
+// }
 ```
 
-## Examples
+### Advanced Filtering
 
-### Filtering Data
-
-Filter data based on various criteria, such as search, in an expressive way:
-
-```ts
-const filterParams = {
+```typescript
+// Complex filtering example
+const filters = {
+  // Simple equality
+  status: 'active',
+  
+  // Array values (IN clause)
+  category: ['electronics', 'books'],
+  
+  // Range filters
+  price: { min: 100, max: 1000 },
+  created_at: { min: '2023-01-01' },
+  
+  // Text search
   search: {
-    columns: ["column1", "column2"],
-    value: "search_value",
+    columns: ['title', 'description'],
+    value: 'keyboard',
+    mode: 'contains' // or 'starts_with', 'ends_with', 'exact'
   },
-  category: "category_name",
-  price: {
-    min: 10,
-    max: 50,
-  },
-  colors: ["red", "blue"],
-};
-
-const filteredQuery = KnexMagic.filter(query, filterParams);
-```
-
-### Cursor Pagination
-
-Paginate data using cursor pagination:
-
-```ts
-const cursorParams = {
-  cursor: "cursor_value", // The cursor value to start from (optional)
-  take: 10, // Number of items per page (optional)
-  direction: "next", // Pagination direction, 'next' or 'previous' (optional)
-};
-
-const options = {
-  key: "id", // Cursor column name (optional)
-  keyPrefix: "id", // Cursor column prefix (optional)
+  
+  // Nested object filters
+  metadata: {
+    color: 'red',
+    size: { min: 'M', max: 'XL' }
+  }
 };
 
 const result = await KnexMagic.paginate({
-  query: filteredQuery,
-  cursorParams,
-  options,
-  callbackCountQuery, // Optional callback to count total records
+  query: knex('products'),
+  cursorParams: { take: 10 },
+  filters
+});
+```
+
+### Streaming Large Datasets
+
+```typescript
+const stream = KnexMagic.paginateStream({
+  query: knex('large_table'),
+  cursorParams: { take: 1000 }
 });
 
-console.log(result);
+for await (const record of stream) {
+  await processRecord(record);
+}
 ```
+
+## API Reference
+
+### KnexMagic.paginate()
+
+Main pagination method with following options:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| query | Knex.QueryBuilder | Base query to paginate |
+| cursorParams | CursorParams | Pagination parameters |
+| options | CursorOptions | Optional configuration |
+| filters | FilterParamsInterface | Optional filters |
+
+[Full API Documentation](./docs/API.md)
+
+## Performance Tips
+
+- Enable caching for frequently accessed data
+- Use `useEstimatedCount` for large tables
+- Set appropriate `take` values
+- Consider using `skipTotalCount` for better performance
+- Index your cursor and filter columns
 
 ## Contributing
 
-If you would like to contribute to KnexMagic or have any suggestions, please open an issue or submit a pull request on our [GitHub repository](https://github.com/mrrashidov/knex-nest).
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- 📚 [Documentation](./docs)
+- 🐛 [Issue Tracker](https://github.com/mrrashidov/knex-magic/issues)
+- 💬 [Discussions](https://github.com/mrrashidov/knex-magic/discussions)
 
 ## Acknowledgments
 
-The authors of Knex.js for providing a powerful query builder.
+- [Knex.js](https://knexjs.org/) team for the amazing query builder
+- [Ithub](https://ithub.uz/) for supporting the project
+- All the contributors who have helped this project grow
 
-**Note**: Make sure to replace 'your_table_name' and other placeholders with actual values in your code.
+---
 
-**Note**: This is a sample README, and you should customize it to suit your project's specific needs and requirements.
-
-## Acknowledgments
-
-We'd like to express our gratitude to the following individuals and projects that have contributed to and inspired this library:
-
-- **Knex.js**: This library is built on top of the powerful [Knex.js](https://knexjs.org/) query builder, which simplifies database interactions and offers extensive support for various database systems. Knex.js has been instrumental in the development of KnexMagic.
-
-- **Open Source Community**: We'd like to thank the entire open-source community for their valuable contributions, bug reports, and feature requests that have helped improve KnexMagic.
-
-- **Anysoft**: We are grateful to the [Anysoft Organization](https://anysoft.uz/) for their support in funding and promoting this project.
+Made with ❤️ by [Shoxrux Rashidov](https://t.me/mrrashidov)
