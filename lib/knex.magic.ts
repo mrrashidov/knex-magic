@@ -24,21 +24,41 @@ export class KnexMagic {
       (query: Knex.QueryBuilder, [key, value]: any) => {
         if (key === "search") {
           const { columns, value: searchValue }: any = value;
-
-          const searchConditions = columns.map((column, index) => {
-            const operator =
-              index === 0
-                ? "LOWER(" + column + ") LIKE ?"
-                : " OR LOWER(" + column + ") LIKE ?";
-
-            return operator;
+          
+          if (!searchValue) return query;
+      
+          // Raqamli qidiruv uchun
+          const isNumeric = !isNaN(searchValue) && !isNaN(parseFloat(searchValue));
+      
+          if (isNumeric) {
+              const numericSearchValue = searchValue.toString();
+              
+              const numericConditions = columns.map((column, index) => {
+                  return index === 0
+                      ? `${column}::text LIKE ?`
+                      : ` OR ${column}::text LIKE ?`;
+              });
+      
+              return query.whereRaw(
+                  "(" + numericConditions.join("") + ")",
+                  columns.map(() => `%${numericSearchValue}%`)
+              );
+          }
+      
+          // Matnli qidiruv uchun
+          const textConditions = columns.map((column, index) => {
+              return index === 0
+                  ? `LOWER(${column}::text) LIKE ?`
+                  : ` OR LOWER(${column}::text) LIKE ?`;
           });
-          const likeValue: string = `%${searchValue.toLowerCase()}%`;
+      
+          const likeValue = `%${searchValue.toString().toLowerCase()}%`;
+          
           return query.whereRaw(
-            "(" + searchConditions.join("") + ")",
-            searchConditions.map(() => likeValue)
+              "(" + textConditions.join("") + ")",
+              columns.map(() => likeValue)
           );
-        }
+      }
         if (
           typeof value === "object" &&
           !Array.isArray(value) &&
@@ -99,94 +119,117 @@ export class KnexMagic {
     cursorParams,
     options,
     countQuery,
-  }: CursorInterface): Promise<BaseResponse<T>> {
-    const cursorColumn: string = options.key || "id";
-    const cursorColumnPrefix: string = options.keyPrefix || "id";
-    const cursorId: number = Number(cursorParams.cursor || 0);
-    const cursorTake: number = Number(cursorParams.take || 10);
-    const cursorDirection: "next" | "prev" = cursorParams.direction || "next";
-    const cursorMeta: PageInfoInterface = {
-      hasNextPage: false,
-      endCursor: null,
-      hasPreviousPage: false,
-      startCursor: null,
+}: CursorInterface): Promise<BaseResponse<T>> {
+    const {
+        key: cursorColumn = "id",
+        keyPrefix: cursorColumnPrefix = "id"
+    } = options;
+    
+    const {
+        cursor = "0",
+        take = 10,
+        direction = "next"
+    } = cursorParams;
+
+    const cursorId = Number(cursor);
+    const limit = Number(take);
+    
+    // Total count hisoblash
+    const totalCount = await this.getTotalCount(query, countQuery, cursorColumnPrefix);
+    
+    // Cursor pagination uchun query yasash
+    const paginatedQuery = this.buildPaginationQuery(
+        query,
+        cursorColumnPrefix,
+        cursorId,
+        direction
+    );
+    
+    // Ma'lumotlarni olish
+    const results = await paginatedQuery.limit(limit + 1);
+    
+    // Pagination meta ma'lumotlarini hisoblash
+    const { data, pageInfo } = this.buildPaginationMeta({
+        results,
+        limit,
+        cursorId,
+        cursorColumn,
+        direction
+    });
+
+    return {
+        data,
+        pageInfo,
+        totalCount
     };
-    let totalCount: number = 0;
-    if (countQuery) {
-      const result = await countQuery;
-      totalCount = Number(result[0].count || 0);
-    } else {
-      const countQuery = query
+}
+
+private static async getTotalCount(
+    query: Knex.QueryBuilder,
+    customCountQuery?: Knex.QueryBuilder,
+    columnPrefix:  string = "id"
+): Promise<number> {
+    if (customCountQuery) {
+        const result = await customCountQuery;
+        return Number(result[0].count || 0);
+    }
+
+    const result = await query
         .clone()
         .clearSelect()
         .clearCounters()
         .clearGroup()
         .clearHaving()
         .clearOrder()
-        .countDistinct(`${cursorColumnPrefix} as count`);
-      const result = await countQuery;
-      totalCount = Number(result[0].count || 0);
-    }
-    const whereOperator = this.getWhereOperator(cursorDirection);
-    if (cursorParams.cursor) {
-      query
-        .where(cursorColumnPrefix, whereOperator.action, cursorId)
-        .orderBy(cursorColumnPrefix, whereOperator.orderBy);
-    } else {
-      query.orderBy(cursorColumnPrefix, whereOperator.orderBy || "asc");
-    }
-    const result = await query.limit(Number(cursorTake + 1));
-    if (result.length > cursorTake) {
-      result.pop();
-      if (cursorDirection === "next") {
-        cursorMeta.endCursor = result[result.length - 1][cursorColumn];
-        cursorMeta.hasNextPage = true;
-        if (cursorId != 0) {
-          cursorMeta.startCursor = result[0][cursorColumn];
-          cursorMeta.hasPreviousPage = true;
-        } else {
-          cursorMeta.startCursor = null;
-          cursorMeta.hasPreviousPage = false;
-        }
-      } else {
-        cursorMeta.endCursor = result[0][cursorColumn];
-        cursorMeta.startCursor = result[result.length - 1][cursorColumn];
-        cursorMeta.hasPreviousPage = true;
-        if (cursorId === 0) {
-          cursorMeta.hasNextPage = false;
-        } else {
-          cursorMeta.hasNextPage = true;
-        }
-      }
-    } else if (result.length != 0) {
-      if (cursorDirection === "next") {
-        cursorMeta.startCursor = result[0][cursorColumn];
-        if (cursorId === 0) {
-          cursorMeta.hasPreviousPage = false;
-        } else {
-          cursorMeta.hasPreviousPage = true;
-        }
-        cursorMeta.endCursor = null;
+        .countDistinct(`${columnPrefix} as count`);
+    
+    return Number(result[0].count || 0);
+}
 
-        cursorMeta.hasNextPage = false;
-      } else {
-        cursorMeta.endCursor = result[0][cursorColumn];
-        if (cursorId != 0) {
-          cursorMeta.hasNextPage = true;
-        } else {
-          cursorMeta.hasNextPage = false;
-        }
-        cursorMeta.startCursor = null;
-
-        cursorMeta.hasPreviousPage = false;
-      }
+private static buildPaginationQuery(
+    query: Knex.QueryBuilder,
+    columnPrefix: string,
+    cursorId: number,
+    direction: "next" | "prev"
+): Knex.QueryBuilder {
+    const { action, orderBy } = this.getWhereOperator(direction);
+    
+    if (cursorId !== 0) {
+        return query
+            .where(columnPrefix, action, cursorId)
+            .orderBy(columnPrefix, orderBy);
     }
-    return {
-      data: result,
-      pageInfo: cursorMeta,
-      totalCount,
+    
+    return query.orderBy(columnPrefix, orderBy);
+}
+
+private static buildPaginationMeta({
+    results,
+    limit,
+    cursorId,
+    cursorColumn,
+    direction
+}: {
+    results: any[];
+    limit: number;
+    cursorId: number;
+    cursorColumn: string;
+    direction: "next" | "prev";
+}): { data: any[], pageInfo: PageInfoInterface } {
+    const hasMore = results.length > limit;
+    if (hasMore) {
+        results.pop();
+    }
+
+    const pageInfo: PageInfoInterface = {
+        hasNextPage: direction === "next" ? hasMore : cursorId !== 0,
+        hasPreviousPage: direction === "next" ? cursorId !== 0 : hasMore,
+        startCursor: results.length ? results[0][cursorColumn] : null,
+        endCursor: results.length ? results[results.length - 1][cursorColumn] : null
     };
-  }
+
+    return { data: results, pageInfo };
+}
 
   /**
    * @description get where operator for cursor pagination
