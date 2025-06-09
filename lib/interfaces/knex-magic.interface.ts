@@ -115,8 +115,8 @@ export interface FilterParamObject {
  * Represents a range of values that can be used as a filter parameter.
  */
 export interface FilterParamRange {
-  min?: number | string | Date;
-  max?: number | string | Date;
+  from?: number | string | Date;
+  to?: number | string | Date;
 }
 
 /**
