@@ -14,7 +14,7 @@ export class KnexMagic {
    */
   public static filter(
     query: Knex.QueryBuilder,
-    params?: FilterParamsInterface,
+    params?: FilterParamsInterface
   ): Knex.QueryBuilder {
     if (!params) {
       return query;
@@ -22,8 +22,7 @@ export class KnexMagic {
 
     return Object.entries(params).reduce(
       (query: Knex.QueryBuilder, [key, value]: any) => {
-        console.log(`Filtering by key: ${key}, value:`, value);
-        if (key === 'search') {
+        if (key === "search") {
           const { columns, value: searchValue }: any = value;
 
           if (!searchValue) return query;
@@ -42,8 +41,8 @@ export class KnexMagic {
             });
 
             return query.whereRaw(
-              '(' + numericConditions.join('') + ')',
-              columns.map(() => `%${numericSearchValue}%`),
+              "(" + numericConditions.join("") + ")",
+              columns.map(() => `%${numericSearchValue}%`)
             );
           }
 
@@ -57,28 +56,33 @@ export class KnexMagic {
           const likeValue = `%${searchValue.toString().toLowerCase()}%`;
 
           return query.whereRaw(
-            '(' + textConditions.join('') + ')',
-            columns.map(() => likeValue),
+            "(" + textConditions.join("") + ")",
+            columns.map(() => likeValue)
           );
         }
         if (
-          typeof value === 'object' &&
+          typeof value === "object" &&
           !Array.isArray(value) &&
           value !== null
         ) {
           // Date range va boshqa range filterlar uchun
           if (value.from !== undefined || value.to !== undefined) {
             const from = value.from
-              ? new Date(value.from).toISOString()
+              ? new Date(value.from).setHours(0, 0, 0, 0)
               : undefined;
-            const to = value.to ? new Date(value.to).toISOString() : undefined;
+            const to = value.to
+              ? new Date(value.to).setHours(23, 59, 59, 999)
+              : undefined;
 
             if (from && to) {
-              return query.whereBetween(key, [from, to]);
+              return query.whereBetween(key, [
+                new Date(from).toISOString(),
+                new Date(to).toISOString(),
+              ]);
             } else if (from) {
-              return query.where(key, '>=', from);
+              return query.where(key, ">=", new Date(from).toISOString());
             } else if (to) {
-              return query.where(key, '<=', to);
+              return query.where(key, "<=", new Date(from).toISOString());
             }
           }
 
@@ -87,17 +91,36 @@ export class KnexMagic {
               if (Array.isArray(subValue)) {
                 return query.whereIn(`${key}.${subKey}`, subValue);
               }
-              if (typeof subValue === 'object' && subValue !== null) {
-                if (subValue.from && subValue.to) {
+              if (typeof subValue === "object" && subValue !== null) {
+                const from = subValue.from
+                  ? new Date(subValue.from).setHours(0, 0, 0, 0)
+                  : undefined;
+                const to = subValue.to
+                  ? new Date(subValue.to).setHours(23, 59, 59, 999)
+                  : undefined;
+
+                if (from && to) {
                   return query.whereBetween(`${key}.${subKey}`, [
-                    subValue.from,
-                    subValue.to,
+                    new Date(from).toISOString(),
+                    new Date(to).toISOString(),
                   ]);
+                } else if (from) {
+                  return query.where(
+                    `${key}.${subKey}`,
+                    ">=",
+                    new Date(from).toISOString()
+                  );
+                } else if (to) {
+                  return query.where(
+                    `${key}.${subKey}`,
+                    "<=",
+                    new Date(to).toISOString()
+                  );
                 }
               }
-              return query.andWhere({ [key + '.' + subKey]: subValue });
+              return query.andWhere({ [key + "." + subKey]: subValue });
             },
-            query,
+            query
           );
         }
         if (Array.isArray(value) && value.length > 0) {
@@ -106,7 +129,7 @@ export class KnexMagic {
 
         return query.where(key, value);
       },
-      query,
+      query
     );
   }
 
@@ -123,10 +146,10 @@ export class KnexMagic {
     options,
     countQuery,
   }: CursorInterface): Promise<BaseResponse<T>> {
-    const { key: cursorColumn = 'id', keyPrefix: cursorColumnPrefix = 'id' } =
+    const { key: cursorColumn = "id", keyPrefix: cursorColumnPrefix = "id" } =
       options || {};
 
-    const { cursor = '0', take = 10, direction = 'next' } = cursorParams;
+    const { cursor = "0", take = 10, direction = "next" } = cursorParams;
 
     const cursorId = Number(cursor);
     const limit = Number(take);
@@ -135,7 +158,7 @@ export class KnexMagic {
     const totalCount = await this.getTotalCount(
       query,
       countQuery,
-      cursorColumnPrefix,
+      cursorColumnPrefix
     );
 
     // Cursor pagination uchun query yasash
@@ -143,7 +166,7 @@ export class KnexMagic {
       query,
       cursorColumnPrefix,
       cursorId,
-      direction,
+      direction
     );
 
     // Ma'lumotlarni olish
@@ -168,7 +191,7 @@ export class KnexMagic {
   private static async getTotalCount(
     query: Knex.QueryBuilder,
     customCountQuery?: Knex.QueryBuilder,
-    columnPrefix: string = 'id',
+    columnPrefix: string = "id"
   ): Promise<number> {
     if (customCountQuery) {
       const result = await customCountQuery;
@@ -191,7 +214,7 @@ export class KnexMagic {
     query: Knex.QueryBuilder,
     columnPrefix: string,
     cursorId: number,
-    direction: 'next' | 'prev',
+    direction: "next" | "prev"
   ): Knex.QueryBuilder {
     const { action, orderBy } = this.getWhereOperator(direction);
 
@@ -215,7 +238,7 @@ export class KnexMagic {
     limit: number;
     cursorId: number;
     cursorColumn: string;
-    direction: 'next' | 'prev';
+    direction: "next" | "prev";
   }): { data: any[]; pageInfo: PageInfoInterface } {
     const hasMore = results.length > limit;
     if (hasMore) {
@@ -223,8 +246,8 @@ export class KnexMagic {
     }
 
     const pageInfo: PageInfoInterface = {
-      hasNextPage: direction === 'next' ? hasMore : cursorId !== 0,
-      hasPreviousPage: direction === 'next' ? cursorId !== 0 : hasMore,
+      hasNextPage: direction === "next" ? hasMore : cursorId !== 0,
+      hasPreviousPage: direction === "next" ? cursorId !== 0 : hasMore,
       startCursor: results.length ? results[0][cursorColumn] : null,
       endCursor: results.length
         ? results[results.length - 1][cursorColumn]
@@ -240,14 +263,14 @@ export class KnexMagic {
    * @private
    * @returns { { action: string, orderBy: string } }
    */
-  public static getWhereOperator(direction: 'next' | 'prev'): {
+  public static getWhereOperator(direction: "next" | "prev"): {
     action: string;
     orderBy: string;
   } {
-    if (direction === 'next') {
-      return { action: '>', orderBy: 'asc' };
+    if (direction === "next") {
+      return { action: ">", orderBy: "asc" };
     } else {
-      return { action: '<', orderBy: 'desc' };
+      return { action: "<", orderBy: "desc" };
     }
   }
 }
